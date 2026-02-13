@@ -12,7 +12,9 @@ This creates `~/.apis/` for your custom APIs and adds the `api` alias to your sh
 
 ## CLI Usage
 
-Built-in APIs are loaded from the repo's `apis.txt`. Your custom APIs in `~/.apis/apis.txt` are merged on top — entries with the same `service.name` override the defaults.
+Built-in APIs are loaded from the repo's `apis.txt`. Private APIs in `~/.apis/apis.txt` are merged on top — entries with the same `service.name` override the defaults. Add your own APIs there.
+
+**Options:** `-time` — print request duration; `-debug` — print fetch request/response info (URL, headers, status) to stderr.
 
 ```bash
 # List all available APIs
@@ -35,6 +37,18 @@ api httpbin.get foo=bar
 
 # Call an API requiring keys
 api openai.chat API_KEY=$OPENAI_API_KEY MODEL=gpt-4o-mini PROMPT="Hello!"
+
+# OpenRouter with optional provider
+api openrouter.chat API_KEY=$OPENROUTER_API_KEY MODEL=openai/gpt-4o-mini PROVIDER=openai PROMPT="Hello!"
+
+# Cerebras (API_KEY or CEREBRAS_API_KEY)
+api cerebras.chat API_KEY=$CEREBRAS_API_KEY MODEL=llama3.1-8b PROMPT="Hello!"
+
+# Time the request
+api -time httpbin.get
+
+# Debug: show request/response info
+api -debug httpbin.get
 ```
 
 ## Library Usage
@@ -47,7 +61,7 @@ import { fetchApi, getRequest } from 'apis';
 // Simple usage
 const data = await fetchApi('httpbin', 'get', { simple: true });
 
-// With variables and aliases (supports API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY)
+// With variables and aliases (API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY)
 const res = await fetchApi('openai', 'chat', {
   vars: {
     API_KEY: 'your-key',
@@ -61,6 +75,9 @@ const customData = await fetchApi('my-service', 'my-name', {
   configPath: './local-apis.txt',
   simple: true
 });
+
+// With debug: logs request/response info to stderr
+const data = await fetchApi('httpbin', 'get', { simple: true, debug: true });
 ```
 
 ## Configuration (`apis.txt`)
@@ -72,3 +89,5 @@ service name url method headers body
 httpbin get https://httpbin.org/get GET {}
 openai chat https://api.openai.com/v1/chat/completions POST "{"Authorization": "Bearer !$API_KEY"}" "{"model": "!$MODEL", "messages": [{"role": "user", "content": "!$PROMPT"}]}"
 ```
+
+OpenRouter supports optional `$PROVIDER` to prefer a specific provider (e.g. `order: ["openai"]`).

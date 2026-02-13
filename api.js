@@ -20,14 +20,25 @@ ${c.bold}Commands${c.reset}
   ${c.cyan}help${c.reset} <pattern>          Show matching lines (e.g. ${c.dim}api help "h*"${c.reset})
   ${c.green}<service.name>${c.reset} [k=v …]  Call API with optional params
 
+${c.bold}Options${c.reset}
+  ${c.cyan}-time${c.reset}                   Print request duration
+  ${c.cyan}-debug${c.reset}                  Print fetch request/response info (e.g. ${c.dim}api -debug httpbin.get${c.reset})
+
 ${c.bold}Note${c.reset}: Use quotes for patterns with wildcards (e.g. "h*") to prevent shell expansion.
+  Private APIs in ${c.dim}~/.apis/apis.txt${c.reset} are merged with built-ins — add your own there.
 
 ${c.bold}Example${c.reset}
   ${c.dim}api openrouter.chat API_KEY=$OPENROUTER_API_KEY MODEL=openai/gpt-4o-mini PROMPT=Hello${c.reset}
+  ${c.dim}api -time httpbin.get${c.reset}
+  ${c.dim}api -debug httpbin.get${c.reset}
 `;
 
-const arg = process.argv[2];
-const pattern = process.argv[3] ?? '.';
+const rawArgs = process.argv.slice(2);
+const timeFlag = rawArgs.includes('-time') || rawArgs.includes('--time');
+const debugFlag = rawArgs.includes('-debug') || rawArgs.includes('--debug');
+const args = rawArgs.filter(a => !['-time','--time','-debug','--debug'].includes(a));
+const arg = args[0];
+const pattern = args[1] ?? '.';
 
 if (!arg || arg === '-h' || arg === '--help') {
   console.log(usage);
@@ -68,7 +79,7 @@ if (/^\w+\.\w+$/.test(arg)) {
     process.exit(1);
   }
   const params = {};
-  for (const a of process.argv.slice(3)) {
+  for (const a of args.slice(1)) {
     const i = a.indexOf('=');
     if (i > 0) params[a.slice(0, i)] = a.slice(i + 1);
   }
@@ -79,8 +90,14 @@ if (/^\w+\.\w+$/.test(arg)) {
     : isJsonPost
       ? { body: JSON.stringify(params), simple: true }
       : { vars: params, simple: true };
+  if (debugFlag) overrides.debug = true;
   try {
+    const t0 = timeFlag ? process.hrtime.bigint() : null;
     const result = await fetchApi(service, name, overrides);
+    if (t0 != null) {
+      const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+      console.error(`\x1b[90m%ims\x1b[0m`, ms.toFixed(0));
+    }
     console.log(JSON.stringify(result, null, 2));
   } catch (err) {
     console.error(err.message);

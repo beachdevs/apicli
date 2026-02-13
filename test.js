@@ -8,6 +8,7 @@ import * as api from './fetch.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const cli = join(root, 'api.js');
+const configPath = join(root, 'apis.txt');
 
 const run = (args, env = {}) => spawnSync(process.execPath, [cli, ...args], {
   encoding: 'utf8',
@@ -16,29 +17,29 @@ const run = (args, env = {}) => spawnSync(process.execPath, [cli, ...args], {
 });
 
 test('fetch.js - getApis', () => {
-  const apis = api.getApis();
+  const apis = api.getApis(configPath);
   assert.ok(Array.isArray(apis));
-  assert.ok(apis.length > 0);
+  assert.ok(apis.length >= 5);
   assert.ok(apis.some(a => a.service === 'httpbin'));
+  assert.ok(apis.some(a => a.service === 'catfact'));
 });
 
 test('fetch.js - getApi', () => {
-  const item = api.getApi('httpbin', 'get');
+  const item = api.getApi('httpbin', 'get', configPath);
   assert.strictEqual(item.service, 'httpbin');
   assert.strictEqual(item.name, 'get');
   assert.strictEqual(item.method, 'GET');
 });
 
 test('fetch.js - getRequest basic', () => {
-  const req = api.getRequest('httpbin', 'get');
+  const req = api.getRequest('httpbin', 'get', {}, configPath);
   assert.strictEqual(req.url, 'https://httpbin.org/get');
   assert.strictEqual(req.method, 'GET');
 });
 
 test('fetch.js - getRequest with vars', () => {
-  // openai chat needs API_KEY, MODEL, PROMPT
   const vars = { API_KEY: 'test-key', MODEL: 'gpt-4', PROMPT: 'hi' };
-  const req = api.getRequest('openai', 'chat', vars);
+  const req = api.getRequest('openai', 'chat', vars, configPath);
   assert.strictEqual(req.headers.Authorization, 'Bearer test-key');
   const body = JSON.parse(req.body);
   assert.strictEqual(body.model, 'gpt-4');
@@ -47,23 +48,20 @@ test('fetch.js - getRequest with vars', () => {
 
 test('fetch.js - getRequest missing required var', () => {
   assert.throws(() => {
-    api.getRequest('openai', 'chat', { MODEL: 'gpt-4' }); // Missing API_KEY and PROMPT
+    api.getRequest('openai', 'chat', { MODEL: 'gpt-4' }, configPath);
   }, /Variable .* is required/);
 });
 
 test('fetch.js - variable aliases', () => {
-  // Clear env vars that might interfere
   const oldKey = process.env.OPENAI_API_KEY;
   const oldKey2 = process.env.API_KEY;
   const oldKey3 = process.env.OPENROUTER_API_KEY;
   delete process.env.OPENAI_API_KEY;
   delete process.env.API_KEY;
   delete process.env.OPENROUTER_API_KEY;
-  
   try {
-    // OPENAI_API_KEY is an alias for API_KEY in fetch.js
     const vars = { OPENAI_API_KEY: 'alias-key', MODEL: 'gpt-4', PROMPT: 'hi' };
-    const req = api.getRequest('openai', 'chat', vars);
+    const req = api.getRequest('openai', 'chat', vars, configPath);
     assert.strictEqual(req.headers.Authorization, 'Bearer alias-key');
   } finally {
     if (oldKey !== undefined) process.env.OPENAI_API_KEY = oldKey;
@@ -73,16 +71,43 @@ test('fetch.js - variable aliases', () => {
 });
 
 test('fetch.js - optional variables', () => {
-  // openrouter.chat uses $SYSTEM_PROMPT (optional) and !$PROMPT (required)
   const vars = { API_KEY: 'key', MODEL: 'm', PROMPT: 'hello' };
-  const req = api.getRequest('openrouter', 'chat', vars);
+  const req = api.getRequest('openrouter', 'chat', vars, configPath);
   const body = JSON.parse(req.body);
-  assert.strictEqual(body.messages[0].content, ''); // $SYSTEM_PROMPT defaults to empty string
+  assert.strictEqual(body.messages[0].content, '');
   assert.strictEqual(body.messages[1].content, 'hello');
 });
 
+test('fetch.js - openrouter optional PROVIDER', () => {
+  const vars = { API_KEY: 'key', MODEL: 'openai/gpt-4o-mini', PROMPT: 'hi', PROVIDER: 'openai' };
+  const req = api.getRequest('openrouter', 'chat', vars, configPath);
+  const body = JSON.parse(req.body);
+  assert.deepStrictEqual(body.provider, { order: ['openai'] });
+});
+
+test('fetch.js - openrouter PROVIDER from env', () => {
+  const old = process.env.PROVIDER;
+  process.env.PROVIDER = 'anthropic';
+  try {
+    const vars = { API_KEY: 'key', MODEL: 'm', PROMPT: 'hi' };
+    const req = api.getRequest('openrouter', 'chat', vars, configPath);
+    const body = JSON.parse(req.body);
+    assert.deepStrictEqual(body.provider, { order: ['anthropic'] });
+  } finally {
+    if (old !== undefined) process.env.PROVIDER = old;
+    else delete process.env.PROVIDER;
+  }
+});
+
+test('fetch.js - openrouter without PROVIDER omits provider block', () => {
+  const vars = { API_KEY: 'key', MODEL: 'openai/gpt-4o-mini', PROMPT: 'hi' };
+  const req = api.getRequest('openrouter', 'chat', vars, configPath);
+  const body = JSON.parse(req.body);
+  assert.strictEqual(body.provider, undefined);
+});
+
 test('fetch.js - fetchApi (real network call to httpbin)', async () => {
-  const res = await api.fetchApi('httpbin', 'get', { simple: true });
+  const res = await api.fetchApi('httpbin', 'get', { simple: true, configPath });
   assert.ok(res.url.includes('httpbin.org'));
 });
 
@@ -122,18 +147,24 @@ test('CLI - no args shows usage', () => {
   assert.match(r.stdout, /Commands/);
 });
 
+test('CLI - -h and --help show usage', () => {
+  assert.strictEqual(run(['-h']).status, 0);
+  assert.strictEqual(run(['--help']).status, 0);
+  assert.match(run(['-h']).stdout, /Commands/);
+});
+
 test('CLI - list', () => {
   const r = run(['list']);
   assert.strictEqual(r.status, 0);
   assert.match(r.stdout, /httpbin\.get/);
-  assert.match(r.stdout, /openai\.chat/);
+  assert.match(r.stdout, /catfact\.getFact/);
 });
 
 test('CLI - list with pattern', () => {
   const r = run(['list', 'httpbin']);
   assert.strictEqual(r.status, 0);
   assert.match(r.stdout, /httpbin\.get/);
-  assert.doesNotMatch(r.stdout, /openai\.chat/);
+  assert.doesNotMatch(r.stdout, /catfact/);
 });
 
 test('CLI - where', () => {
@@ -156,16 +187,42 @@ test('CLI - service call (real network)', () => {
 });
 
 test('CLI - service call with params', () => {
-  // Using catfact as it doesn't need keys but let's see if we can pass params to httpbin
   const r = run(['httpbin.get', 'foo=bar']);
   assert.strictEqual(r.status, 0);
-  // httpbin.get doesn't use params in its URL template in apis.txt, 
-  // but let's check one that does or just check it doesn't crash.
   JSON.parse(r.stdout);
+});
+
+test('CLI - -time can appear anywhere in args', () => {
+  const r = run(['httpbin.get', '-time']);
+  assert.strictEqual(r.status, 0);
+  assert.match(r.stderr, /\d+ms/);
+  JSON.parse(r.stdout);
+});
+
+test('CLI - -debug prints fetch info', () => {
+  const r = run(['-debug', 'httpbin.get']);
+  assert.strictEqual(r.status, 0);
+  assert.match(r.stderr, /> GET https:\/\/httpbin\.org\/get/);
+  assert.match(r.stderr, /< 200/);
+  JSON.parse(r.stdout);
+});
+
+test('CLI - --debug and api -debug in different position', () => {
+  const r = run(['httpbin.get', '--debug']);
+  assert.strictEqual(r.status, 0);
+  assert.match(r.stderr, /> GET/);
+  assert.match(r.stderr, /< 200/);
 });
 
 test('CLI - unknown API', () => {
   const r = run(['unknown.api']);
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /Unknown API/);
+});
+
+test('CLI - -time prints duration', () => {
+  const r = run(['-time', 'httpbin.get']);
+  assert.strictEqual(r.status, 0);
+  assert.match(r.stderr, /\d+ms/);
+  JSON.parse(r.stdout);
 });
