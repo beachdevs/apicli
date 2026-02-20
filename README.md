@@ -52,6 +52,9 @@ apicli -time httpbin.get
 
 # Debug: show request/response info
 apicli -debug httpbin.get
+
+# API example
+apicli catfact.getFact | jq ".fact"
 ```
 
 ## Library Usage
