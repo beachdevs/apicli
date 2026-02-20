@@ -114,14 +114,15 @@ if (/^\w+\.\w+$/.test(arg)) {
   const hasBodyTemplate = api.body != null && String(api.body).trim() !== '';
   const isJsonPost = api.method === 'POST' && String(api.headers || '').includes('json');
   const overrides = hasBodyTemplate
-    ? { vars: params, simple: true, configPath }
+    ? { vars: params, configPath }
     : isJsonPost
-      ? { body: JSON.stringify(params), simple: true, configPath }
-      : { vars: params, simple: true, configPath };
+      ? { body: JSON.stringify(params), configPath }
+      : { vars: params, configPath };
   if (debugFlag) overrides.debug = true;
   try {
     const t0 = timeFlag ? process.hrtime.bigint() : null;
-    const result = await fetchApi(service, name, overrides);
+    const response = await fetchApi(service, name, overrides);
+    const result = await response.json();
     if (t0 != null) {
       const ms = Number(process.hrtime.bigint() - t0) / 1e6;
       console.error(`\x1b[90m%ims\x1b[0m`, ms.toFixed(0));

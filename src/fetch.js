@@ -141,8 +141,7 @@ const redact = (h) => {
 };
 
 export async function fetchApi(service, name, overrides = {}) {
-  const opts = overrides === 'simple' ? { simple: true } : overrides;
-  const { vars = {}, simple, configPath, debug, ...rest } = opts;
+  const { vars = {}, configPath, debug, ...rest } = overrides;
   const { url, method, headers, body } = getRequest(service, name, { ...vars, ...rest }, configPath);
   if (debug) {
     console.error('\x1b[90m> %s %s\x1b[0m', method, url);
@@ -154,7 +153,7 @@ export async function fetchApi(service, name, overrides = {}) {
     console.error('\x1b[90m< %s %s\x1b[0m', res.status, res.statusText);
     for (const [k, v] of res.headers.entries()) console.error('\x1b[90m< %s: %s\x1b[0m', k, v);
   }
-  return simple ? res.json() : res;
+  return res;
 }
 
 let _configPath = null;
@@ -184,7 +183,7 @@ export async function get(id, opts = {}) {
   const { configPath = _configPath, vars, debug, ...rest } = opts ?? {};
   const api = getApi(service, name, configPath);
   if (!api) throw new Error(`Unknown API: ${id}`);
-  const res = await fetchApi(service, name, { ...rest, vars: vars ?? rest, simple: false, debug, configPath });
+  const res = await fetchApi(service, name, { ...rest, vars: vars ?? rest, debug, configPath });
   const bodyText = await res.text();
   return responseWrapper(bodyText);
 }

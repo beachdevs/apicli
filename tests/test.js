@@ -126,8 +126,9 @@ test('fetch.js - openrouter without PROVIDER omits provider block', () => {
 });
 
 test('fetch.js - fetchApi (mock network call)', async () => {
-  const res = await api.fetchApi('httpbin', 'get', { simple: true, configPath });
-  assert.strictEqual(res.url, 'https://httpbin.org/get');
+  const res = await api.fetchApi('httpbin', 'get', { configPath });
+  const json = await res.json();
+  assert.strictEqual(json.url, 'https://httpbin.org/get');
 });
 
 test('fetch.js - custom configPath (txt)', () => {
@@ -160,8 +161,9 @@ test('fetch.js - fetchApi with overrides and configPath', async () => {
   const tmpPath = join(testsDir, 'tmp-fetch-apis.txt');
   fs.writeFileSync(tmpPath, 'service name url method headers body\nbin get https://httpbin.org/get GET {}');
   try {
-    const res = await api.fetchApi('bin', 'get', { configPath: tmpPath, simple: true });
-    assert.strictEqual(res.url, 'https://httpbin.org/get');
+    const res = await api.fetchApi('bin', 'get', { configPath: tmpPath });
+    const json = await res.json();
+    assert.strictEqual(json.url, 'https://httpbin.org/get');
   } finally {
     fs.unlinkSync(tmpPath);
   }
