@@ -5,10 +5,10 @@ A quick and flexible API tool for calling services from the command line or as a
 ## Installation
 
 ```bash
-git clone https://github.com/beachdevs/apicli.git && cd apicli && ./install.sh
+npm -g install beachdevs/apicli
 ```
 
-This creates `~/.apicli/` for your custom APIs and adds the `apicli` alias to your shell. Run `git pull` to get updates.
+This installs the latest release globally. `apicli` merges built-in `apicli.toml` with any overrides from `~/.apicli/` automatically.
 
 ## CLI Usage
 
