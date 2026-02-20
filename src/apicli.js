@@ -15,6 +15,7 @@ const c = { dim: '\x1b[90m', cyan: '\x1b[36m', yellow: '\x1b[33m', green: '\x1b[
 
 const usage = `
 🔌 ${c.bold}apicli${c.reset} ${c.dim}— call APIs (${c.cyan}./apicli${c.reset})${c.reset}
+${c.dim}apicli.toml:${c.reset} ${defaultTomlPath}
 
 ${c.bold}Commands${c.reset}
   ${c.cyan}list${c.reset} [pattern]          List APIs (e.g. ${c.dim}apicli list "openrouter*"${c.reset})
@@ -25,9 +26,6 @@ ${c.bold}Options${c.reset}
   ${c.cyan}-time${c.reset}                   Print request duration
   ${c.cyan}-debug${c.reset}                  Print fetch request/response info (e.g. ${c.dim}apicli -debug httpbin.get${c.reset})
   ${c.cyan}-config${c.reset} <path>         Use custom config file (e.g. ${c.dim}apicli -config ./custom.toml httpbin.get${c.reset})
-
-${c.bold}Config${c.reset}: The active config file path(s) print to stderr before every run (the merging of default + user settings or the custom file specified with -config).
-  Built-in definitions live in ${c.dim}${defaultTomlPath}${c.reset}; user overrides live in ${c.dim}~/.apicli/apicli.toml${c.reset}.
 
 ${c.bold}Example${c.reset}
   ${c.dim}apicli openrouter.chat API_KEY=$OPENROUTER_API_KEY MODEL=openai/gpt-4o-mini PROMPT=Hello${c.reset}
