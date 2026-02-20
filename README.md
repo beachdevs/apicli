@@ -12,11 +12,9 @@ This installs the latest release globally. `apicli` merges built-in `apicli.toml
 
 ## CLI Usage
 
-Built-in APIs are loaded from the repo's `apicli.toml` (or `apis.txt`). Private APIs in `~/.apicli/apicli.toml` (or `apis.txt`) are merged on top — entries with the same `service.name` override the defaults. Add your own APIs there.
+A single `apicli.toml` (the built-in copy from the package or a custom one passed via `-config <path>`) defines all APIs. Use `~/.apicli/apicli.toml` to override or extend defaults. Run `apicli` with no arguments to print the effective config paths before any other output.
 
-**Options:** `-time` — print request duration; `-debug` — print fetch request/response info to stderr; `-config <path>` — use a custom config file (`.toml` or `.txt`).
-
-Running `apicli` with no arguments logs the active config file path(s) to stderr so you can see which `*.toml`/`*.txt` definitions are being merged.
+**Options:** `-time` — print request duration; `-debug` — print fetch request/response info to stderr; `-config <path>` — use a custom `.toml` file.
 
 ```bash
 # List all available APIs
@@ -76,7 +74,7 @@ const res = await fetchApi('openai', 'chat', {
   }
 });
 
-// Custom config file (apicli.toml or apis.txt)
+// Custom config file (apicli.toml)
 const customData = await fetchApi('my-service', 'my-name', {
   configPath: './custom.toml',
   simple: true
