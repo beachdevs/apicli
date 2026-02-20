@@ -53,6 +53,27 @@ const args = rawArgs.filter((a, i) => {
 const arg = args[0];
 const pattern = args[1] ?? '.';
 
+const defaultConfigPath = () => fs.existsSync(defaultTomlPath) ? defaultTomlPath : defaultTxtPath;
+const userConfigPath = () => fs.existsSync(userTomlPath) ? userTomlPath : (fs.existsSync(userTxtPath) ? userTxtPath : null);
+const printConfigInfo = () => {
+  if (configPath) {
+    console.error('config:', configPath);
+    return;
+  }
+  console.error('default:', defaultConfigPath());
+  const userPath = userConfigPath();
+  if (userPath) console.error('user:   ', userPath);
+};
+const getConfigFiles = (override) => {
+  if (override) return [override];
+  const files = [defaultConfigPath()];
+  const userPath = userConfigPath();
+  if (userPath) files.push(userPath);
+  return files;
+};
+
+printConfigInfo();
+
 if (!arg || arg === '-h' || arg === '--help') {
   console.log(usage);
   process.exit(0);
@@ -67,24 +88,9 @@ if (arg === 'list') {
   process.exit(0);
 }
 
-if (arg === 'where') {
-  if (configPath) {
-    console.log('config:', configPath);
-  } else {
-    const defaultPath = fs.existsSync(defaultTomlPath) ? defaultTomlPath : defaultTxtPath;
-    console.log('default:', defaultPath);
-    const userPath = fs.existsSync(userTomlPath) ? userTomlPath : (fs.existsSync(userTxtPath) ? userTxtPath : null);
-    if (userPath) console.log('user:   ', userPath);
-  }
-  process.exit(0);
-}
-
 if (arg === 'help') {
   const re = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
-  const files = configPath ? [configPath] : [
-    fs.existsSync(defaultTomlPath) ? defaultTomlPath : defaultTxtPath,
-    fs.existsSync(userTomlPath) ? userTomlPath : (fs.existsSync(userTxtPath) ? userTxtPath : null)
-  ].filter(Boolean);
+  const files = getConfigFiles(configPath);
   for (const f of files) {
     if (!fs.existsSync(f)) continue;
     for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
@@ -131,10 +137,7 @@ if (/^\w+\.\w+$/.test(arg)) {
 
 // search apicli.toml/apis.txt
 const re2 = new RegExp(arg.replace(/\*/g, '.*'), 'i');
-const files = configPath ? [configPath] : [
-  fs.existsSync(defaultTomlPath) ? defaultTomlPath : defaultTxtPath,
-  fs.existsSync(userTomlPath) ? userTomlPath : (fs.existsSync(userTxtPath) ? userTxtPath : null)
-].filter(Boolean);
+const files = getConfigFiles(configPath);
 for (const f of files) {
   if (!fs.existsSync(f)) continue;
   for (const line of fs.readFileSync(f, 'utf8').split('\n')) {

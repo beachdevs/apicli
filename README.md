@@ -16,15 +16,14 @@ Built-in APIs are loaded from the repo's `apicli.toml` (or `apis.txt`). Private 
 
 **Options:** `-time` — print request duration; `-debug` — print fetch request/response info to stderr; `-config <path>` — use a custom config file (`.toml` or `.txt`).
 
+Running `apicli` always logs the active config file path(s) to stderr so you can see which `*.toml`/`*.txt` definitions are being merged.
+
 ```bash
 # List all available APIs
 apicli list
 
 # Filter APIs
 apicli list httpbin
-
-# Show the location of the config file(s) being used
-apicli where
 
 # Use a custom config file
 apicli -config ./custom.toml list

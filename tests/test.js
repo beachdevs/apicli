@@ -23,6 +23,8 @@ const run = (args, env = {}) => {
   });
 };
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 let originalFetch;
 test.before(async () => {
   originalFetch = globalThis.fetch;
@@ -207,6 +209,8 @@ test('CLI - list', () => {
   assert.strictEqual(r.status, 0);
   assert.match(r.stdout, /httpbin\.get/);
   assert.match(r.stdout, /catfact\.getFact/);
+  const expectedDefault = join(projectRoot, 'apicli.toml');
+  assert.match(r.stderr, new RegExp(`default:.*${escapeRegex(expectedDefault)}`));
 });
 
 test('CLI - list with pattern', () => {
@@ -216,12 +220,6 @@ test('CLI - list with pattern', () => {
   assert.doesNotMatch(r.stdout, /catfact/);
 });
 
-test('CLI - where', () => {
-  const r = run(['where']);
-  assert.strictEqual(r.status, 0);
-  assert.match(r.stdout, /(apicli\.toml|apis\.txt)/);
-});
-
 test('CLI - -config uses custom config', () => {
   const tmpPath = join(testsDir, 'tmp-config.toml');
   fs.writeFileSync(tmpPath, '[apis."custom.get"]\nurl = "https://httpbin.org/get"\nmethod = "GET"\nheaders = {}');
@@ -229,9 +227,7 @@ test('CLI - -config uses custom config', () => {
     const r = run(['-config', tmpPath, 'list']);
     assert.strictEqual(r.status, 0);
     assert.match(r.stdout, /custom\.get/);
-    const r2 = run(['-config', tmpPath, 'where']);
-    assert.strictEqual(r2.status, 0);
-    assert.match(r2.stdout, /config:/);
+    assert.match(r.stderr, new RegExp(`config:.*${escapeRegex(tmpPath)}`));
   } finally {
     fs.unlinkSync(tmpPath);
   }
