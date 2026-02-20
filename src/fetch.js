@@ -140,12 +140,18 @@ const redact = (h) => {
   return out;
 };
 
+const formatHeaders = (hdrs) => {
+  if (!hdrs) return '';
+  const entries = hdrs instanceof Headers ? Array.from(hdrs.entries()) : Object.entries(hdrs);
+  return entries.map(([k, v]) => `${k}: ${v}`).join('\n');
+};
+
 export async function fetchApi(service, name, overrides = {}) {
   const { vars = {}, configPath, debug, ...rest } = overrides;
   const { url, method, headers, body } = getRequest(service, name, { ...vars, ...rest }, configPath);
   if (debug) {
     console.error('\x1b[90m> %s %s\x1b[0m', method, url);
-    console.error('\x1b[90m> headers: %s\x1b[0m', JSON.stringify(redact(headers)));
+    console.error('\x1b[90m> headers:%s\x1b[0m', headers ? `\n${formatHeaders(headers)}` : ' (none)');
     if (body) console.error('\x1b[90m> body: %s\x1b[0m', body.slice(0, 200) + (body.length > 200 ? '...' : ''));
   }
   const res = await fetch(url, { method, headers, body: body || undefined });
