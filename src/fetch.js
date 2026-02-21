@@ -1,22 +1,17 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parse as parseToml } from '@iarna/toml';
 
-const runJq = (filter, input) => {
-  const f = filter.startsWith('.') ? filter : `.${filter}`;
-  const r = spawnSync('jq', ['-r', f], { input, encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
-  if (r.error) throw r.error;
-  if (r.status !== 0) throw new Error(r.stderr || `jq exited ${r.status}`);
+const runJq = (q, input) => {
+  const r = spawnSync('jq', ['-r', q.startsWith('.') ? q : `.${q}`], { input, encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
+  if (r.error || r.status) throw new Error(r.stderr || r.error || `jq exited ${r.status}`);
   return r.stdout;
 };
 
-const parseTxt = (c) => {
-  const lines = c.trim().split('\n');
-  const h = lines[0].trim().split(/\s+/).filter(Boolean);
-  const rows = lines.slice(1).map(l => {
+const parseTxt = (c) => ({
+  apis: c.trim().split('\n').slice(1).map(l => {
     const v = []; let cur = '', q = 0;
     for (let i = 0; i < l.length; i++) {
       if (l[i] === '"' && l[i+1] === '"') { cur += '"'; i++; }
@@ -24,52 +19,23 @@ const parseTxt = (c) => {
       else if (l[i] === ' ' && !q) { v.push(cur); cur = ''; }
       else cur += l[i];
     }
-    return [...v, cur];
-  });
-  return { apis: rows.map(r => Object.fromEntries(h.map((k, i) => {
-    let v = r[i] === 'null' ? null : r[i];
-    if (k !== 'body' && v != null) {
-      try { if (typeof v === 'string' && (v.startsWith('{') || v.startsWith('['))) v = JSON.parse(v); } catch(e){}
-    }
-    return [k, v];
-  }))) };
-};
+    const row = [...v, cur], keys = c.trim().split('\n')[0].trim().split(/\s+/);
+    return Object.fromEntries(keys.map((k, i) => {
+      let val = row[i] === 'null' ? null : row[i];
+      if (k !== 'body' && val?.startsWith?.('{')) try { val = JSON.parse(val); } catch(e){}
+      return [k, val];
+    }));
+  })
+});
 
-const parse = (content, isToml) => {
-  if (isToml) {
-    const data = parseToml(content);
-    const apis = [];
-    if (data.apis) {
-      for (const [id, api] of Object.entries(data.apis)) {
-        const [service, name] = id.split('.');
-        apis.push({ service, name, ...api });
-      }
-    }
-    return { apis };
-  }
-  return parseTxt(content);
-};
-
-const VAR_ALIASES = { 
-  API_KEY: ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'CEREBRAS_API_KEY'],
-  OPENAI_API_KEY: ['API_KEY'],
-  OPENROUTER_API_KEY: ['API_KEY'],
-  CEREBRAS_API_KEY: ['API_KEY'],
-  CLOUDFLARE_ANALYTICS_TOKEN: ['CLOUDFLARE_API_TOKEN'],
-  CLOUDFLARE_API_TOKEN: ['CLOUDFLARE_ANALYTICS_TOKEN']
-};
-const isEnvVar = (k) => /^[A-Z][A-Z0-9_]*$/.test(k);
-const sub = (s, v = {}) => s?.replace?.(/(\$!?)([A-Za-z_]\w*)/g, (_, prefix, k) => {
-  const isRequired = prefix.includes('!');
-  if (!isEnvVar(k)) return `${prefix}${k}`; // preserve GraphQL/camelCase vars
+const sub = (s, v = {}) => s?.replace?.(/(\$!?)([A-Za-z_]\w*)/g, (_, p, k) => {
+  const al = { 
+    API_KEY: ['OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY'],
+    OPENAI_API_KEY: ['API_KEY'], OPENROUTER_API_KEY: ['API_KEY'], CEREBRAS_API_KEY: ['API_KEY']
+  };
   let val = v[k] ?? process.env[k];
-  if (val == null && VAR_ALIASES[k]) {
-    for (const alt of VAR_ALIASES[k]) {
-      val = v[alt] ?? process.env[alt];
-      if (val != null) break;
-    }
-  }
-  if (isRequired && val == null) throw new Error(`Variable ${k} is required`);
+  if (val == null && al[k]) val = al[k].map(a => v[a] ?? process.env[a]).find(x => x != null);
+  if (p.includes('!') && val == null) throw new Error(`Variable ${k} is required`);
   return val ?? '';
 }) ?? s;
 
@@ -81,107 +47,59 @@ const walk = (obj, v) => {
 };
 
 export function getApis(configPath) {
-  if (configPath) {
-    const isToml = configPath.endsWith('.toml');
-    return parse(fs.readFileSync(configPath, 'utf8'), isToml).apis;
+  const path = configPath || (fs.existsSync(join(homedir(), '.apicli', 'apicli.toml')) ? join(homedir(), '.apicli', 'apicli.toml') : 
+    (fs.existsSync(join(homedir(), '.apicli', 'apis.txt')) ? join(homedir(), '.apicli', 'apis.txt') : null));
+  if (!path) return [];
+  const content = fs.readFileSync(path, 'utf8'), isToml = path.endsWith('.toml');
+  if (isToml) {
+    const data = parseToml(content);
+    return Object.entries(data.apis || {}).map(([id, api]) => ({ service: id.split('.')[0], name: id.split('.')[1], ...api }));
   }
-  const userTomlPath = join(homedir(), '.apicli', 'apicli.toml');
-  const userTxtPath = join(homedir(), '.apicli', 'apis.txt');
-  const userPath = fs.existsSync(userTomlPath) ? userTomlPath : (fs.existsSync(userTxtPath) ? userTxtPath : null);
-  if (!userPath) return [];
-  const isUserToml = userPath.endsWith('.toml');
-  return parse(fs.readFileSync(userPath, 'utf8'), isUserToml).apis;
+  return parseTxt(content).apis;
 }
 
-export function getApi(service, name, configPath) {
-  return getApis(configPath).find(a => a.service === service && a.name === name);
-}
+export const getApi = (s, n, p) => getApis(p).find(a => a.service === s && a.name === n);
 
-const providerBlock = ', "provider": {"order": ["$PROVIDER"]}';
-const providerSub = (body, provider) =>
-  provider ? body.replace(providerBlock, providerBlock.replace('$PROVIDER', provider)) : body.replace(providerBlock, '');
-
-const expandBearer = (headers, v) => {
+export function getRequest(s, n, vars = {}, p) {
+  const api = getApi(s, n, p);
+  if (!api) throw new Error(`Unknown API: ${s}.${n}`);
+  const v = { ...vars }, provider = v.PROVIDER ?? process.env.PROVIDER;
+  let { url, method, headers, body } = api;
+  url = sub(url, v);
   if (typeof headers === 'string' && headers.startsWith('BEARER ')) {
-    const token = sub(headers.slice(7).trim(), v);
-    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    headers = { Authorization: `Bearer ${sub(headers.slice(7).trim(), v)}`, 'Content-Type': 'application/json' };
   }
-  return headers;
-};
-
-export function getRequest(service, name, vars = {}, configPath) {
-  const api = getApi(service, name, configPath);
-  if (!api) throw new Error(`Unknown API: ${service}/${name}`);
-  const provider = vars.PROVIDER ?? process.env.PROVIDER;
-  const v = { ...vars };
-  const url = sub(api.url, v);
-  let headers = api.headers;
-  headers = expandBearer(headers, v);
   headers = walk(headers, v);
-  let body = api.body != null ? String(api.body).trim() : undefined;
-  if (body != null && body.includes(providerBlock)) body = providerSub(body, provider);
-  body = body != null ? sub(body, v) : undefined;
-  return { url, method: api.method, headers, body };
+  if (body != null) {
+    body = String(body).trim();
+    const pb = ', "provider": {"order": ["$PROVIDER"]}';
+    body = provider ? body.replace(pb, pb.replace('$PROVIDER', provider)) : body.replace(pb, '');
+    body = sub(body, v);
+  }
+  return { url, method, headers, body };
 }
 
-const redact = (h) => {
-  if (!h || typeof h !== 'object') return h;
-  const out = { ...h };
-  if (out.Authorization) out.Authorization = 'Bearer ***';
-  return out;
-};
-
-const formatHeaders = (hdrs) => {
-  if (!hdrs) return '';
-  const entries = hdrs instanceof Headers ? Array.from(hdrs.entries()) : Object.entries(hdrs);
-  return entries.map(([k, v]) => `${k}: ${v}`).join('\n');
-};
-
-export async function fetchApi(service, name, overrides = {}) {
-  const { vars = {}, configPath, debug, ...rest } = overrides;
-  const { url, method, headers, body } = getRequest(service, name, { ...vars, ...rest }, configPath);
+export async function fetchApi(s, n, opts = {}) {
+  const { vars = {}, configPath, debug, ...rest } = opts;
+  const req = getRequest(s, n, { ...vars, ...rest }, configPath);
   if (debug) {
-    console.error('\x1b[90m> %s %s\x1b[0m', method, url);
-    console.error('\x1b[90m> headers:%s\x1b[0m', headers ? `\n${formatHeaders(headers)}` : ' (none)');
-    if (body) console.error('\x1b[90m> body: %s\x1b[0m', body.slice(0, 200) + (body.length > 200 ? '...' : ''));
+    console.error('\x1b[90m> %s %s\x1b[0m\n\x1b[90m> headers:\n%s\x1b[0m', req.method, req.url, 
+      Object.entries(req.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n'));
+    if (req.body) console.error('\x1b[90m> body: %s\x1b[0m', req.body.slice(0, 200) + (req.body.length > 200 ? '...' : ''));
   }
-  const res = await fetch(url, { method, headers, body: body || undefined });
+  const res = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body || undefined });
   if (debug) {
-    console.error('');
-    console.error('\x1b[90m< %s %s\x1b[0m', res.status, res.statusText);
+    console.error('\n\x1b[90m< %s %s\x1b[0m', res.status, res.statusText);
     for (const [k, v] of res.headers.entries()) console.error('\x1b[90m< %s: %s\x1b[0m', k, v);
   }
   return res;
 }
 
-let _configPath = null;
-
-export function useConfig(configPath) {
-  _configPath = configPath ?? null;
-  return { configPath: _configPath, get: (id, opts) => get(id, { ...opts, configPath: _configPath }) };
-}
-
-function responseWrapper(bodyText) {
-  let parsed;
-  try { parsed = JSON.parse(bodyText); } catch { parsed = null; }
-  return {
-    json(jqQuery) {
-      if (jqQuery === undefined) return parsed;
-      return runJq(jqQuery, bodyText);
-    },
-    text() { return bodyText; }
-  };
-}
-
 export async function get(id, opts = {}) {
-  const i = id.indexOf('.');
-  if (i <= 0 || i === id.length - 1) throw new Error(`Invalid id: ${id}`);
-  const service = id.slice(0, i);
-  const name = id.slice(i + 1);
-  const { configPath = _configPath, vars, debug, ...rest } = opts ?? {};
-  const api = getApi(service, name, configPath);
-  if (!api) throw new Error(`Unknown API: ${id}`);
-  const res = await fetchApi(service, name, { ...rest, vars: vars ?? rest, debug, configPath });
-  const bodyText = await res.text();
-  return responseWrapper(bodyText);
+  const [s, n] = id.split('.'), res = await fetchApi(s, n, opts);
+  const text = await res.text();
+  return {
+    json: (q) => q ? runJq(q, text) : JSON.parse(text),
+    text: () => text
+  };
 }
