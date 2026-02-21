@@ -2,7 +2,7 @@
 
 <img src="data:image/svg+xml;utf8,%3Csvg width='48' height='48' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='48' height='48' rx='12' fill='%2336b5ff'/%3E%3Cpath d='M15 24h18M24 15l9 9-9 9' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" alt="apicli logo" width="48" height="48" />
 
-A quick and flexible API tool for calling services from the command line or as a Node.js module.
+A quick and flexible API tool for calling services from the command line or as a Bun module.
 
 ## Installation
 

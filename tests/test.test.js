@@ -8,18 +8,17 @@ import * as api from '../src/fetch.js';
 
 const testsDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(testsDir, '..');
-const cli = join(projectRoot, 'src', 'apicli.js');
+const cli = join(projectRoot, 'src', 'apicli');
 const configPath = join(projectRoot, 'apicli.toml');
 const mockFetchPath = join(testsDir, 'mock-fetch.js');
 
 const run = (args, env = {}) => {
-  const nodeOptions = [process.env.NODE_OPTIONS, env.NODE_OPTIONS, `--import=${mockFetchPath}`]
-    .filter(Boolean)
-    .join(' ');
-  return spawnSync(process.execPath, [cli, ...args], {
+  const isBun = process.versions.bun != null;
+  const preloadFlag = isBun ? '--preload' : '--import';
+  return spawnSync(process.execPath, [`${preloadFlag}=${mockFetchPath}`, cli, ...args], {
     encoding: 'utf8',
     cwd: projectRoot,
-    env: { ...process.env, ...env, NODE_OPTIONS: nodeOptions }
+    env: { ...process.env, ...env }
   });
 };
 
@@ -272,6 +271,7 @@ test('CLI - -debug prints fetch info', () => {
   assert.strictEqual(r.status, 0);
   assert.match(r.stderr, /> GET https:\/\/httpbin\.org\/get/);
   assert.match(r.stderr, /< 200/);
+  assert.match(r.stderr, /< x-mock-fetch: 1/);
   JSON.parse(r.stdout);
 });
 
