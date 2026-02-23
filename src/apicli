@@ -12,8 +12,8 @@ const userTxtPath = join(userDir, 'apis.txt');
 
 if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
 if (!fs.existsSync(userTomlPath) && !fs.existsSync(userTxtPath)) {
-  const examplePath = join(root, 'apicli.example.toml');
-  if (fs.existsSync(examplePath)) fs.copyFileSync(examplePath, userTomlPath);
+  const defaultPath = join(root, 'apicli.toml');
+  if (fs.existsSync(defaultPath)) fs.copyFileSync(defaultPath, userTomlPath);
 }
 
 const c = { dim: '\x1b[90m', cyan: '\x1b[36m', yellow: '\x1b[33m', green: '\x1b[32m', bold: '\x1b[1m', reset: '\x1b[0m' };
@@ -54,19 +54,22 @@ const args = rawArgs.filter((a, i) => {
 const arg = args[0];
 const pattern = args[1] ?? '.';
 
-const userConfigPath = () => fs.existsSync(userTomlPath) ? userTomlPath : (fs.existsSync(userTxtPath) ? userTxtPath : null);
+const userConfigPath = () => [userTomlPath, userTxtPath].find(fs.existsSync);
 const printConfigInfo = () => {
-  if (configPath) {
-    console.error('config:', configPath);
-    return;
-  }
-  const userPath = userConfigPath();
-  if (userPath) console.error('user:   ', userPath);
+  const p = configPath ?? userConfigPath();
+  if (p) console.error(configPath ? 'config:' : 'user:   ', p);
 };
 const getConfigFiles = (override) => {
-  if (override) return [override];
-  const userPath = userConfigPath();
-  return userPath ? [userPath] : [];
+  const p = override ?? userConfigPath();
+  return p ? [p] : [];
+};
+const searchConfig = (re) => {
+  for (const f of getConfigFiles(configPath)) {
+    if (!fs.existsSync(f)) continue;
+    for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+      if (re.test(line)) console.log(line);
+    }
+  }
 };
 
 const showConfigInfo = args.length === 0;
@@ -88,13 +91,7 @@ if (arg === 'ls') {
 
 if (arg === 'help') {
   const re = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
-  const files = getConfigFiles(configPath);
-  for (const f of files) {
-    if (!fs.existsSync(f)) continue;
-    for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
-      if (re.test(line)) console.log(line);
-    }
-  }
+  searchConfig(re);
   process.exit(0);
 }
 
@@ -111,7 +108,18 @@ if (/^\w+\.\w+$/.test(arg)) {
     if (i > 0) params[a.slice(0, i)] = a.slice(i + 1);
   }
   const hasBodyTemplate = api.body != null && String(api.body).trim() !== '';
-  const isJsonPost = api.method === 'POST' && String(api.headers || '').includes('json');
+  const isJsonPost = api.method === 'POST' && (() => {
+    if (!api.headers) return false;
+    if (typeof api.headers === 'string') {
+      const h = api.headers.toLowerCase();
+      return h.includes('json') || h.startsWith('bearer ');
+    }
+    if (typeof api.headers === 'object') {
+      const ct = Object.entries(api.headers).find(([k]) => k.toLowerCase() === 'content-type')?.[1];
+      return typeof ct === 'string' && ct.toLowerCase().includes('json');
+    }
+    return false;
+  })();
   const overrides = hasBodyTemplate
     ? { vars: params, configPath }
     : isJsonPost
@@ -136,10 +144,4 @@ if (/^\w+\.\w+$/.test(arg)) {
 
 // search apicli.toml/apis.txt
 const re2 = new RegExp(arg.replace(/\*/g, '.*'), 'i');
-const files = getConfigFiles(configPath);
-for (const f of files) {
-  if (!fs.existsSync(f)) continue;
-  for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
-    if (re2.test(line)) console.log(line);
-  }
-}
+searchConfig(re2);

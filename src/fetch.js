@@ -4,14 +4,23 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { parse as parseToml } from '@iarna/toml';
 
+const ALIASES = {
+  API_KEY: ['OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY'],
+  OPENAI_API_KEY: ['API_KEY'],
+  OPENROUTER_API_KEY: ['API_KEY'],
+  CEREBRAS_API_KEY: ['API_KEY']
+};
+
 const runJq = (q, input) => {
   const r = spawnSync('jq', ['-r', q.startsWith('.') ? q : `.${q}`], { input, encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
   if (r.error || r.status) throw new Error(r.stderr || r.error || `jq exited ${r.status}`);
   return r.stdout;
 };
 
-const parseTxt = (c) => ({
-  apis: c.trim().split('\n').slice(1).map(l => {
+const parseTxt = (c) => {
+  const lines = c.trim().split('\n');
+  const keys = lines.shift().trim().split(/\s+/);
+  return { apis: lines.map(l => {
     const v = []; let cur = '', q = 0;
     for (let i = 0; i < l.length; i++) {
       if (l[i] === '"' && l[i+1] === '"') { cur += '"'; i++; }
@@ -19,22 +28,19 @@ const parseTxt = (c) => ({
       else if (l[i] === ' ' && !q) { v.push(cur); cur = ''; }
       else cur += l[i];
     }
-    const row = [...v, cur], keys = c.trim().split('\n')[0].trim().split(/\s+/);
+    const row = [...v, cur];
     return Object.fromEntries(keys.map((k, i) => {
       let val = row[i] === 'null' ? null : row[i];
       if (k !== 'body' && val?.startsWith?.('{')) try { val = JSON.parse(val); } catch(e){}
       return [k, val];
     }));
-  })
-});
+  }) };
+};
 
-const sub = (s, v = {}) => s?.replace?.(/(\$!?)([A-Za-z_]\w*)/g, (_, p, k) => {
-  const al = { 
-    API_KEY: ['OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'CEREBRAS_API_KEY'],
-    OPENAI_API_KEY: ['API_KEY'], OPENROUTER_API_KEY: ['API_KEY'], CEREBRAS_API_KEY: ['API_KEY']
-  };
+const sub = (s, v = {}) => s?.replace?.(/(\$\$)|(\$!?)([A-Za-z_]\w*)/g, (_, esc, p, k) => {
+  if (esc) return '$';
   let val = v[k] ?? process.env[k];
-  if (val == null && al[k]) val = al[k].map(a => v[a] ?? process.env[a]).find(x => x != null);
+  if (val == null && ALIASES[k]) val = ALIASES[k].map(a => v[a] ?? process.env[a]).find(x => x != null);
   if (p.includes('!') && val == null) throw new Error(`Variable ${k} is required`);
   return val ?? '';
 }) ?? s;
@@ -47,8 +53,8 @@ const walk = (obj, v) => {
 };
 
 export function getApis(configPath) {
-  const path = configPath || (fs.existsSync(join(homedir(), '.apicli', 'apicli.toml')) ? join(homedir(), '.apicli', 'apicli.toml') : 
-    (fs.existsSync(join(homedir(), '.apicli', 'apis.txt')) ? join(homedir(), '.apicli', 'apis.txt') : null));
+  const base = join(homedir(), '.apicli');
+  const path = configPath ?? [join(base, 'apicli.toml'), join(base, 'apis.txt')].find(fs.existsSync);
   if (!path) return [];
   const content = fs.readFileSync(path, 'utf8'), isToml = path.endsWith('.toml');
   if (isToml) {

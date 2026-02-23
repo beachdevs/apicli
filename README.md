@@ -10,11 +10,11 @@ A quick and flexible API tool for calling services from the command line or as a
 npm -g install beachdevs/apicli
 ```
 
-This installs the latest release globally. `apicli` merges built-in `apicli.toml` with any overrides from `~/.apicli/` automatically.
+This installs the latest release globally. On first run, `apicli` copies the package `apicli.toml` into `~/.apicli/apicli.toml` if no user config exists.
 
 ## CLI Usage
 
-A single `apicli.toml` (the built-in copy from the package or a custom one passed via `-config <path>`) defines all APIs. Use `~/.apicli/apicli.toml` to override or extend defaults. Run `apicli` with no arguments to print the effective config paths before any other output.
+A single `apicli.toml` (either the default copied into `~/.apicli/apicli.toml` or a custom one passed via `-config <path>`) defines all APIs. Run `apicli` with no arguments to print the effective config path before any other output.
 
 **Options:** `-time` — print request duration; `-debug` — print fetch request/response info to stderr; `-config <path>` — use a custom `.toml` file.
 
