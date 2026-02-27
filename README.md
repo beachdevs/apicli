@@ -1,109 +1,115 @@
 # apicli
 
-A quick and flexible API tool for calling services from the command line or as a Bun module.
+⚡ A fast CLI + code library for calling API definitions from a single YAML file.
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 npx beachdevs/apicli catfact.getFact
 ```
 
-API IDs use `<service>.<name>` (for example `httpbin.get` or `echo.ws`). You can define HTTP(S) or WebSocket endpoints in `apicli.yaml`. Runtime parameters are passed as `KEY=value`. Template variables support optional (`$VAR`) and required (`$!VAR`) forms. You can use `apicli` from the CLI or import it in code.
+`apicli` API IDs use `<service>.<name>` (for example `httpbin.get`, `openai.chat`, `echo.ws`).
 
-## CLI Usage
+- Supports HTTP(S) and WebSocket endpoints.
+- Pass runtime params as `KEY=value`.
+- Use `$VAR` for optional variables and `$!VAR` for required variables in templates.
+- Works from CLI and from code.
 
-A single `apicli.yaml` defines all APIs. Use `-config <path>` to point at a custom file.
+## 🤖 Use From LLMs
 
-**Options:** `-time` — print request duration; `-debug` — print fetch request/response info to stderr; `-config <path>` — use a custom `.yaml` file; `fetch <name>` — copy one API definition into `./apicli.yaml`.
+Prompt:
+
+`Learn api definitions from https://raw.githubusercontent.com/beachdevs/apicli/refs/heads/master/apicli.yaml`
+
+## 🧭 CLI Usage
 
 ```bash
-# List all available APIs
+# Show help/options
+npx beachdevs/apicli
+
+# List APIs
 npx beachdevs/apicli ls
-
-# Alias for ls
 npx beachdevs/apicli list openai
-
-# Filter APIs
 npx beachdevs/apicli ls httpbin
 
-# Copy one API definition into ./apicli.yaml
+# Copy one API definition into local ./apicli.yaml
 npx beachdevs/apicli fetch echo.ws
+npx beachdevs/apicli fetch openai.chat
 
 # Use a custom config file
 npx beachdevs/apicli -config ./custom.yaml ls
-npx beachdevs/apicli -config ~/my-apis.yaml httpbin.get
+npx beachdevs/apicli -config ./custom.yaml httpbin.get
 
-# Show matching lines from config
+# Show matching config lines
 npx beachdevs/apicli help httpbin
 
-# Call an API
-npx beachdevs/apicli httpbin.get
-
-# Call an API with parameters
+# Call an API with params
 npx beachdevs/apicli httpbin.get foo=bar
 
-# Call an API requiring keys
-npx beachdevs/apicli openai.chat API_KEY=$OPENAI_API_KEY MODEL=gpt-4o-mini PROMPT="Hello!"
-
-# OpenRouter with optional provider
-npx beachdevs/apicli openrouter.chat API_KEY=$OPENROUTER_API_KEY MODEL=openai/gpt-4o-mini PROVIDER=openai PROMPT="Hello!"
-
-# Cerebras (API_KEY or CEREBRAS_API_KEY)
-npx beachdevs/apicli cerebras.chat API_KEY=$CEREBRAS_API_KEY MODEL=llama3.1-8b PROMPT="Hello!"
-
-# Time the request
+# Time + debug
 npx beachdevs/apicli -time httpbin.get
-
-# Debug: show request/response info
 npx beachdevs/apicli -debug httpbin.get
-
-# API example
-npx beachdevs/apicli catfact.getFact | jq ".fact"
 ```
 
-## Code Example
+## 🔑 Auth + Params Examples
 
-Install globally with Bun or add as a dependency with npm:
+```bash
+# OpenAI-compatible
+npx beachdevs/apicli openai.chat \
+  OPENAI_COMPATIBLE_BASE_URL=https://api.openai.com/v1 \
+  OPENAI_COMPATIBLE_API_KEY=$OPENAI_API_KEY \
+  MODEL=gpt-4o-mini \
+  PROMPT="Hello"
+
+# OpenRouter with optional provider
+npx beachdevs/apicli openrouter.chat \
+  API_KEY=$OPENROUTER_API_KEY \
+  MODEL=openai/gpt-4o-mini \
+  PROVIDER=openai \
+  PROMPT="Hello"
+```
+
+## 🧩 Use In Code
+
+Install with Bun or npm:
 
 ```bash
 bun add -g beachdevs/apicli
 npm install beachdevs/apicli
 ```
 
-Then import and call from code:
+Then call from JavaScript:
 
 ```javascript
 import { fetchApi, getRequest, getApis } from 'apicli';
 
-// Simple usage
+// List loaded API definitions
+const apis = getApis();
+
+// Build request without sending
+const req = getRequest('httpbin', 'get');
+console.log(req.url);
+
+// Send request
 const res = await fetchApi('httpbin', 'get');
 const data = await res.json();
+console.log(data.url);
 
-// With variables and aliases (API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY)
-const res = await fetchApi('openai', 'chat', {
+// With variables
+const chat = await fetchApi('openai', 'chat', {
   vars: {
-    API_KEY: 'your-key',
-    MODEL: 'gpt-4o',
+    OPENAI_COMPATIBLE_BASE_URL: 'https://api.openai.com/v1',
+    OPENAI_COMPATIBLE_API_KEY: process.env.OPENAI_API_KEY,
+    MODEL: 'gpt-4o-mini',
     PROMPT: 'Hello world'
   }
 });
-
-// Custom config file (apicli.yaml)
-const customData = await fetchApi('my-service', 'my-name', {
-  configPath: './custom.yaml'
-});
-const customJson = await customData.json();
-
-// With debug: logs request/response info to stderr
-const res2 = await fetchApi('httpbin', 'get', { debug: true });
-const data2 = await res2.json();
+console.log(await chat.json());
 ```
 
-## Configuration
+## 🗂️ Config Format (`apicli.yaml`)
 
-### apicli.yaml
-
-Each API is a top-level key named `service.name` (no root object). Use `$VAR` (optional) or `$!VAR` (required) for variable substitution. Use `BEARER $!TOKEN` in `headers` as shorthand for `Authorization: Bearer` + `Content-Type: application/json`.
+Top-level keys are `service.name` (no root object).
 
 ```yaml
 httpbin.get:
@@ -119,6 +125,14 @@ openai.chat:
     Content-Type: application/json
   body: |
     {"model":"$!MODEL","messages":[{"role":"user","content":"$!PROMPT"}]}
+
+echo.ws:
+  url: wss://echo-websocket.fly.dev/.ws
+  body: $!PROMPT
 ```
 
-OpenRouter supports optional `$PROVIDER` to prefer a specific provider (e.g. `order: ["openai"]`).
+## ✅ Notes
+
+- `fetch <name>` merges into local `./apicli.yaml` (creates it if missing).
+- `-config <path>` lets you point to any YAML file.
+- `apis.txt` format is still supported for compatibility.
