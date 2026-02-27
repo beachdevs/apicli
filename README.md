@@ -109,6 +109,8 @@ const chat = await fetchApi('openai', 'chat', {
 console.log(await chat.json());
 ```
 
+`fetchApi` returns a standard `Response` object, so you can also use `status`, `ok`, `headers`, `text()`, `arrayBuffer()`, and other Fetch response APIs.
+
 ## 🗂️ Config Format (`apicli.yaml`)
 
 Top-level keys are `service.name`.
