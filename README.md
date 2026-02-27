@@ -8,6 +8,8 @@ A quick and flexible API tool for calling services from the command line or as a
 npx beachdevs/apicli catfact.getFact
 ```
 
+API IDs use `<service>.<name>` (for example `httpbin.get` or `echo.ws`). You can define HTTP(S) or WebSocket endpoints in `apicli.yaml`. Runtime parameters are passed as `KEY=value`. Template variables support optional (`$VAR`) and required (`$!VAR`) forms. You can use `apicli` from the CLI or import it in code.
+
 ## CLI Usage
 
 A single `apicli.yaml` defines all APIs. Use `-config <path>` to point at a custom file.
