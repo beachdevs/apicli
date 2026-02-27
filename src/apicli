@@ -31,7 +31,7 @@ const usage = `
 
 ${c.bold}Commands${c.reset}
   ${c.cyan}ls|list${c.reset} [pattern]       List APIs (e.g. ${c.dim}apicli list "openrouter"${c.reset})
-  ${c.cyan}get${c.reset} <name>              Copy API definition to ${c.dim}./apicli.yaml${c.reset}
+  ${c.cyan}fetch${c.reset} <name>            Copy API definition to ${c.dim}./apicli.yaml${c.reset}
   ${c.cyan}help${c.reset} <pattern>          Show matching lines (e.g. ${c.dim}apicli help "httpbin*"${c.reset})
   ${c.green}<service.name>${c.reset} [k=v …]  Call API with optional params
 
@@ -68,12 +68,17 @@ const cleanApiDefinition = (a) => {
 };
 
 const userConfigPath = () => [userYamlPath, userTxtPath].find(fs.existsSync);
+const defaultConfigPath = () => {
+  const bundled = join(root, 'apicli.yaml');
+  return fs.existsSync(bundled) ? bundled : null;
+};
+const resolveConfigPath = (override) => override ?? userConfigPath() ?? defaultConfigPath();
 const printConfigInfo = () => {
-  const p = configPath ?? userConfigPath();
+  const p = resolveConfigPath(configPath);
   if (p) console.error(configPath ? 'config:' : 'user:   ', p);
 };
 const getConfigFiles = (override) => {
-  const p = override ?? userConfigPath();
+  const p = resolveConfigPath(override);
   return p ? [p] : [];
 };
 const searchConfig = (re) => {
@@ -94,8 +99,9 @@ if (!arg || arg === '-h' || arg === '--help') {
 }
 
 if (arg === 'ls' || arg === 'list') {
+  const p = resolveConfigPath(configPath);
   const re = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
-  for (const a of getApis(configPath)) {
+  for (const a of getApis(p)) {
     const id = a.id ?? `${a.service}.${a.name}`;
     if (re.test(id)) console.log(id);
   }
@@ -108,13 +114,14 @@ if (arg === 'help') {
   process.exit(0);
 }
 
-if (arg === 'get') {
+if (arg === 'fetch') {
+  const p = resolveConfigPath(configPath);
   const name = args[1];
   if (!name) {
-    console.error('Error: get requires an API name (e.g. openai.chat)');
+    console.error('Error: fetch requires an API name (e.g. openai.chat)');
     process.exit(1);
   }
-  const match = getApis(configPath).find(a => a.id === name);
+  const match = getApis(p).find(a => a.id === name);
   if (!match) {
     console.error('Unknown API:', name);
     process.exit(1);
@@ -137,9 +144,10 @@ if (arg === 'get') {
 }
 
 if (/^\w+\.\w+$/.test(arg)) {
+  const p = resolveConfigPath(configPath);
   const [service, name] = arg.split('.');
-  const { base, steps } = getFlow(service, name, configPath);
-  const api = base ?? getApi(service, name, configPath);
+  const { base, steps } = getFlow(service, name, p);
+  const api = base ?? getApi(service, name, p);
   if (!api && steps.length === 0) {
     console.error('Unknown API:', arg);
     process.exit(1);
@@ -164,12 +172,12 @@ if (/^\w+\.\w+$/.test(arg)) {
     return false;
   })();
   const overrides = isWs
-    ? { vars: params, configPath }
+    ? { vars: params, configPath: p }
     : hasBodyTemplate
-      ? { vars: params, configPath }
+      ? { vars: params, configPath: p }
       : isJsonPost
-        ? { body: JSON.stringify(params), configPath }
-        : { vars: params, configPath };
+        ? { body: JSON.stringify(params), configPath: p }
+        : { vars: params, configPath: p };
   if (debugFlag) overrides.debug = true;
   try {
     const t0 = timeFlag ? process.hrtime.bigint() : null;
