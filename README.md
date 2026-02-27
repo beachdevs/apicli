@@ -53,6 +53,8 @@ npx beachdevs/apicli -debug httpbin.get
 
 ## 🔑 Auth + Params Examples
 
+Parameters with matching environment variables are populated automatically if you don't pass them explicitly.
+
 ```bash
 # OpenAI-compatible
 npx beachdevs/apicli openai.chat \
@@ -109,7 +111,7 @@ console.log(await chat.json());
 
 ## 🗂️ Config Format (`apicli.yaml`)
 
-Top-level keys are `service.name` (no root object).
+Top-level keys are `service.name`.
 
 ```yaml
 httpbin.get:
