@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { parseYaml } from './yaml.js';
 
 const ALIASES = {
@@ -10,6 +11,18 @@ const ALIASES = {
   OPENROUTER_API_KEY: ['API_KEY'],
   CEREBRAS_API_KEY: ['API_KEY']
 };
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const userConfigPath = () => join(homedir(), '.apicli');
+const bundledConfigPath = join(root, 'apicli.yaml');
+const isReadableFile = (path) => {
+  try {
+    return fs.statSync(path).isFile();
+  } catch {
+    return false;
+  }
+};
+const resolveDefaultConfigPath = () => [userConfigPath(), bundledConfigPath].find(isReadableFile);
 
 const runJq = (q, input) => {
   const r = spawnSync('jq', ['-r', q.startsWith('.') ? q : `.${q}`], { input, encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
@@ -70,9 +83,8 @@ const parseYamlApis = (content) => {
 };
 
 export function getApis(configPath) {
-  const base = join(homedir(), '.apicli');
-  const path = configPath ?? [join(base, 'apicli.yaml'), join(base, 'apicli.yml'), join(base, 'apis.txt')].find(fs.existsSync);
-  if (!path) return [];
+  const path = configPath ?? resolveDefaultConfigPath();
+  if (!path || !isReadableFile(path)) return [];
   const content = fs.readFileSync(path, 'utf8');
   if (path.endsWith('.txt')) {
     return parseTxt(content).apis.map(a => ({ ...parseId(`${a.service}.${a.name}`), ...a }));

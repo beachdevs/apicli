@@ -11,6 +11,7 @@ const projectRoot = join(testsDir, '..');
 const cli = join(projectRoot, 'src', 'apicli');
 const configPath = join(testsDir, 'test-apis.yaml');
 const mockFetchPath = join(testsDir, 'mock-fetch.js');
+const tempHomes = [];
 
 const run = (args, env = {}) => {
   const isBun = process.versions.bun != null;
@@ -23,6 +24,11 @@ const run = (args, env = {}) => {
 };
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const makeTempHome = () => {
+  const dir = fs.mkdtempSync(join(testsDir, 'tmp-home-'));
+  tempHomes.push(dir);
+  return dir;
+};
 
 let originalFetch;
 test.before(async () => {
@@ -77,6 +83,7 @@ cerebras.chat2:
 test.after(() => {
   globalThis.fetch = originalFetch;
   if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+  for (const dir of tempHomes) fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('fetch.js - getApis', () => {
@@ -201,6 +208,12 @@ test('fetch.js - custom configPath (yaml)', () => {
   }
 });
 
+test('fetch.js - directory config paths are ignored', () => {
+  const tmpPath = makeTempHome();
+  const apis = api.getApis(tmpPath);
+  assert.deepStrictEqual(apis, []);
+});
+
 test('fetch.js - fetchApi with overrides and configPath', async () => {
   const tmpPath = join(testsDir, 'tmp-fetch-apis.txt');
   fs.writeFileSync(tmpPath, 'service name url method headers body\nbin get https://httpbin.org/get GET {}');
@@ -243,6 +256,22 @@ test('CLI - no args shows usage', () => {
   assert.strictEqual(r.status, 0);
   assert.match(r.stdout, /Commands/);
   assert.match(r.stdout, /Options/);
+});
+
+test('CLI - no args reports bundled config when ~/.apicli is missing', () => {
+  const home = makeTempHome();
+  const r = run([], { HOME: home });
+  assert.strictEqual(r.status, 0);
+  assert.match(r.stderr, new RegExp(`bundled:\\s+${escapeRegex(join(projectRoot, 'apicli.yaml'))}`));
+});
+
+test('CLI - no args reports ~/.apicli when present', () => {
+  const home = makeTempHome();
+  const userConfig = join(home, '.apicli');
+  fs.writeFileSync(userConfig, 'local.get:\n  url: "https://example.com"\n  method: "GET"\n  headers: {}');
+  const r = run([], { HOME: home });
+  assert.strictEqual(r.status, 0);
+  assert.match(r.stderr, new RegExp(`user:\\s+${escapeRegex(userConfig)}`));
 });
 
 test('CLI - -h and --help show usage', () => {
@@ -345,14 +374,14 @@ test('CLI - -time prints duration', () => {
   JSON.parse(r.stdout);
 });
 
-test('CLI - get writes API definition to local apicli.yaml', () => {
+test('CLI - fetch writes API definition to local apicli.yaml', () => {
   const outPath = join(projectRoot, 'apicli.yaml');
   const backupPath = join(projectRoot, 'apicli.yaml.test-backup');
   const hadOriginal = fs.existsSync(outPath);
   if (hadOriginal) fs.copyFileSync(outPath, backupPath);
   fs.writeFileSync(outPath, 'existing.api:\n  url: "https://example.com"\n  method: "GET"\n');
   try {
-    const r = run(['-config', configPath, 'get', 'httpbin.get']);
+    const r = run(['-config', configPath, 'fetch', 'httpbin.get']);
     assert.strictEqual(r.status, 0);
     assert.match(r.stdout, /httpbin\.get/);
     const out = Bun.YAML.parse(fs.readFileSync(outPath, 'utf8'));

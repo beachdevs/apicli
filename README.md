@@ -80,6 +80,8 @@ bun add -g beachdevs/apicli
 npm install beachdevs/apicli
 ```
 
+During install, `apicli` asks whether it should copy the bundled `apicli.yaml` to `~/.apicli`. If you choose `no`, `apicli` will use the `apicli.yaml` published with the repo until you point it at another file with `-config` or create `~/.apicli`.
+
 Then call from JavaScript:
 
 ```javascript
@@ -137,6 +139,7 @@ echo.ws:
 
 ## ✅ Notes
 
+- Default config lookup is `~/.apicli`, then the bundled repo `apicli.yaml`.
 - `fetch <name>` merges into local `./apicli.yaml` (creates it if missing).
 - `-config <path>` lets you point to any YAML file.
 - `apis.txt` format is still supported for compatibility.
