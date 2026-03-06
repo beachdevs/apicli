@@ -4,9 +4,23 @@
 
 Keep your API definitions in one `.apicat` file, then list them, inspect them, and fire them off from the CLI or from JavaScript. It is built for quick experiments, repeatable calls, and "what was that curl again?" moments.
 
-## Quick Start
+## ⚡ Quick Start
 
-Install it:
+The shortest way to think about it is:
+
+```bash
+npx apicat <ls | service.name> KEY=VALUE
+```
+
+Examples:
+
+```bash
+npx apicat ls
+npx apicat httpbin.get
+npx apicat openrouter.chat API_KEY=$OPENROUTER_API_KEY MODEL=openai/gpt-4o-mini PROMPT="hello"
+```
+
+Want the short command too? Install it:
 
 ```bash
 npm install -g apicat
@@ -14,20 +28,20 @@ npm install -g apicat
 bun add -g apicat
 ```
 
-Then make it do something:
+Then you can use either form:
 
 ```bash
-npx apicat
 ac ls
 ac httpbin.get
-ac openrouter.chat API_KEY=$OPENROUTER_API_KEY MODEL=openai/gpt-4o-mini PROMPT="hello"
+npx apicat ls
+npx apicat httpbin.get
 ```
 
 `npx apicat` and `ac` hit the exact same CLI.
 
 API IDs use `<service>.<name>` form, like `httpbin.get`, `openai.chat`, or `echo.ws`.
 
-## Why It’s Fun
+## 🎉 Why It’s Fun
 
 - One command: `ac`
 - One config file: `.apicat`
@@ -35,7 +49,7 @@ API IDs use `<service>.<name>` form, like `httpbin.get`, `openai.chat`, or `echo
 - Variables with `$VAR` and required variables with `$!VAR`
 - Works as both a CLI and a library
 
-## How It Thinks
+## 🧠 How It Thinks
 
 `ac` looks for config in this order:
 
@@ -45,7 +59,7 @@ API IDs use `<service>.<name>` form, like `httpbin.get`, `openai.chat`, or `echo
 
 On first interactive run, it can copy the bundled `.apicat` to `~/.apicat` so you have your own editable version instead of poking at the packaged one.
 
-## CLI Cheatsheet
+## 🧰 CLI Cheatsheet
 
 ```bash
 # show the menu
@@ -76,7 +90,7 @@ ac fetch openai.chat
 ac update
 ```
 
-## A Few Good Tricks
+## 🪄 A Few Good Tricks
 
 ```bash
 # OpenAI-compatible chat
@@ -99,7 +113,7 @@ ac httpbin.get
 
 Parameters automatically fall back to matching environment variables when possible.
 
-## Use It From Code
+## 💻 Use It From Code
 
 Install it locally if you want to import it:
 
@@ -137,7 +151,7 @@ console.log(await chat.json());
 
 `fetchApi` returns a normal Fetch `Response`, so you can use `status`, `ok`, `headers`, `text()`, `json()`, and the rest of the usual response methods.
 
-## The `.apicat` Spellbook
+## 📜 The `.apicat` Spellbook
 
 Top-level keys are `service.name`.
 
@@ -163,13 +177,13 @@ echo.ws:
 
 `fetch <name>` merges a definition into local `./.apicat`, creating it if needed.
 
-## For LLM Prompts
+## 🤖 For LLM Prompts
 
 If you want a model to learn your API definitions, point it at:
 
 `https://raw.githubusercontent.com/beachdevs/apicat/refs/heads/master/.apicat`
 
-## Small Print
+## 🔎 Small Print
 
 - `update` overwrites `~/.apicat` with the latest published `.apicat`
 - `-config <path>` can point at any YAML file
