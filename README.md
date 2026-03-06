@@ -1,16 +1,8 @@
 # apicat
 
-`apicat` gives you a tiny API toolbox with one short command: `ac`.
+`apicat` is a tiny API sidekick with one short command: `ac`.
 
-Keep your API definitions in a single `.apicat` file, then list them, inspect them, and call them from the CLI or from JavaScript. It works well for quick experiments, repeatable API calls, and "what was that curl again?" moments.
-
-## Why It’s Nice
-
-- One command: `ac`
-- One config file: `.apicat`
-- HTTP and WebSocket support
-- Variables with `$VAR` and required variables with `$!VAR`
-- Works as both a CLI and a library
+Keep your API definitions in one `.apicat` file, then list them, inspect them, and fire them off from the CLI or from JavaScript. It is built for quick experiments, repeatable calls, and "what was that curl again?" moments.
 
 ## Quick Start
 
@@ -22,7 +14,7 @@ npm install -g apicat
 bun add -g apicat
 ```
 
-Then use it:
+Then make it do something:
 
 ```bash
 npx apicat
@@ -31,11 +23,19 @@ ac httpbin.get
 ac openrouter.chat API_KEY=$OPENROUTER_API_KEY MODEL=openai/gpt-4o-mini PROMPT="hello"
 ```
 
-`npx apicat` and `ac` hit the same CLI.
+`npx apicat` and `ac` hit the exact same CLI.
 
 API IDs use `<service>.<name>` form, like `httpbin.get`, `openai.chat`, or `echo.ws`.
 
-## The Shape Of It
+## Why It’s Fun
+
+- One command: `ac`
+- One config file: `.apicat`
+- HTTP and WebSocket support
+- Variables with `$VAR` and required variables with `$!VAR`
+- Works as both a CLI and a library
+
+## How It Thinks
 
 `ac` looks for config in this order:
 
@@ -43,32 +43,32 @@ API IDs use `<service>.<name>` form, like `httpbin.get`, `openai.chat`, or `echo
 2. `~/.apicat`
 3. the bundled `.apicat`
 
-On first interactive run, it can copy the bundled `.apicat` to `~/.apicat` so you have your own editable version.
+On first interactive run, it can copy the bundled `.apicat` to `~/.apicat` so you have your own editable version instead of poking at the packaged one.
 
 ## CLI Cheatsheet
 
 ```bash
-# show help
+# show the menu
 ac
 
-# list APIs
+# list the toy box
 ac ls
 ac list openai
 ac ls httpbin
 
-# show matching config lines
+# grep, but friendlier
 ac help httpbin
 
-# use a custom config
+# bring your own config
 ac -config ./custom.yaml ls
 ac -config ./custom.yaml httpbin.get
 
-# call an API with runtime vars
+# call something
 ac httpbin.get foo=bar
 ac -time httpbin.get
 ac -debug httpbin.get
 
-# copy one API definition into local ./.apicat
+# steal one definition into local ./.apicat
 ac fetch echo.ws
 ac fetch openai.chat
 
@@ -76,10 +76,10 @@ ac fetch openai.chat
 ac update
 ```
 
-## A Few Good Examples
+## A Few Good Tricks
 
 ```bash
-# OpenAI-compatible API
+# OpenAI-compatible chat
 ac openai.chat \
   OPENAI_COMPATIBLE_BASE_URL=https://api.openai.com/v1 \
   OPENAI_COMPATIBLE_API_KEY=$OPENAI_API_KEY \
@@ -93,7 +93,7 @@ ac openrouter.chat \
   PROVIDER=openai \
   PROMPT="Say hello"
 
-# simple GET
+# plain old GET
 ac httpbin.get
 ```
 
@@ -137,7 +137,7 @@ console.log(await chat.json());
 
 `fetchApi` returns a normal Fetch `Response`, so you can use `status`, `ok`, `headers`, `text()`, `json()`, and the rest of the usual response methods.
 
-## The `.apicat` File
+## The `.apicat` Spellbook
 
 Top-level keys are `service.name`.
 
@@ -169,7 +169,7 @@ If you want a model to learn your API definitions, point it at:
 
 `https://raw.githubusercontent.com/beachdevs/apicat/refs/heads/master/.apicat`
 
-## Notes
+## Small Print
 
 - `update` overwrites `~/.apicat` with the latest published `.apicat`
 - `-config <path>` can point at any YAML file
